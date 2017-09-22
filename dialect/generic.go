@@ -10,29 +10,29 @@ import (
 	"github.com/rancher/k8s-sql/kv"
 )
 
-type generic struct {
-	cleanup string
-	get     string
-	list    string
-	create  string
-	delete  string
-	update  string
+type Generic struct {
+	CleanupSQL string
+	GetSQL     string
+	ListSQL    string
+	CreateSQL  string
+	DeleteSQL  string
+	UpdateSQL  string
 }
 
-func (g *generic) Start(ctx context.Context, db *sql.DB) {
+func (g *Generic) Start(ctx context.Context, db *sql.DB) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(time.Minute):
-			db.ExecContext(ctx, g.cleanup, time.Now().Second())
+			db.ExecContext(ctx, g.CleanupSQL, time.Now().Second())
 		}
 	}
 }
 
-func (g *generic) Get(ctx context.Context, db *sql.DB, key string) (*kv.KeyValue, error) {
+func (g *Generic) Get(ctx context.Context, db *sql.DB, key string) (*kv.KeyValue, error) {
 	value := kv.KeyValue{}
-	row := db.QueryRowContext(ctx, g.get, key)
+	row := db.QueryRowContext(ctx, g.GetSQL, key)
 
 	err := scan(row.Scan, &value)
 	if err == sql.ErrNoRows {
@@ -42,8 +42,8 @@ func (g *generic) Get(ctx context.Context, db *sql.DB, key string) (*kv.KeyValue
 	return &value, err
 }
 
-func (g *generic) List(ctx context.Context, db *sql.DB, key string) ([]*kv.KeyValue, error) {
-	rows, err := db.QueryContext(ctx, g.list, key+"%")
+func (g *Generic) List(ctx context.Context, db *sql.DB, key string) ([]*kv.KeyValue, error) {
+	rows, err := db.QueryContext(ctx, g.ListSQL, key+"%")
 
 	if err != nil {
 		return nil, err
@@ -62,15 +62,15 @@ func (g *generic) List(ctx context.Context, db *sql.DB, key string) ([]*kv.KeyVa
 	return resp, nil
 }
 
-func (g *generic) Create(ctx context.Context, db *sql.DB, key string, value []byte, ttl uint64) error {
+func (g *Generic) Create(ctx context.Context, db *sql.DB, key string, value []byte, ttl uint64) error {
 	if ttl != 0 {
 		ttl = uint64(time.Now().Second()) + ttl
 	}
-	_, err := db.ExecContext(ctx, g.create, key, []byte(value), ttl)
+	_, err := db.ExecContext(ctx, g.CreateSQL, key, []byte(value), ttl)
 	return err
 }
 
-func (g *generic) Delete(ctx context.Context, db *sql.DB, key string, revision *int64) (*kv.KeyValue, error) {
+func (g *Generic) Delete(ctx context.Context, db *sql.DB, key string, revision *int64) (*kv.KeyValue, error) {
 	value, err := g.Get(ctx, db, key)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (g *generic) Delete(ctx context.Context, db *sql.DB, key string, revision *
 		return nil, kv.ErrNotExists
 	}
 
-	result, err := db.ExecContext(ctx, g.delete, key, value.Revision)
+	result, err := db.ExecContext(ctx, g.DeleteSQL, key, value.Revision)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (g *generic) Delete(ctx context.Context, db *sql.DB, key string, revision *
 	return value, nil
 }
 
-func (g *generic) Update(ctx context.Context, db *sql.DB, key string, value []byte, revision int64) (*kv.KeyValue, *kv.KeyValue, error) {
+func (g *Generic) Update(ctx context.Context, db *sql.DB, key string, value []byte, revision int64) (*kv.KeyValue, *kv.KeyValue, error) {
 	oldKv, err := g.Get(ctx, db, key)
 	if err != nil {
 		return nil, nil, err
@@ -109,7 +109,7 @@ func (g *generic) Update(ctx context.Context, db *sql.DB, key string, value []by
 		return nil, nil, rdbms.ErrRevisionMatch
 	}
 
-	result, err := db.ExecContext(ctx, g.update, value, oldKv.Revision+1, key, oldKv.Revision)
+	result, err := db.ExecContext(ctx, g.UpdateSQL, value, oldKv.Revision+1, key, oldKv.Revision)
 	if err != nil {
 		return nil, nil, err
 	}
