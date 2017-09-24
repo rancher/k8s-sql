@@ -10,7 +10,7 @@ This has very little to do with the technical merits of etcd or a traditional SQ
 
 Another consideration is that SQL is a frontend added to many non-traditional databases.  Because this implementation uses very simple SQL statements (single table, no joins, simple SELECT, UPDATE, DELETE) it may be possible to leverage this interface to bring more storage backends to Kubernetes.
 
-And lastly, I (@ibuildthecloud) like to experiement and often do things because I can :)
+And lastly, I (@ibuildthecloud) like to experiment and often do things because I can :)
 
 How?
 ----
