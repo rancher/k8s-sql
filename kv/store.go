@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+	err2 "github.com/pkg/errors"
 	"golang.org/x/net/context"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -312,8 +313,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
 	}
-	// TODO: List revision seems silly and complicated. Setting to 0
-	return s.versioner.UpdateList(listObj, 0)
+	return s.versioner.UpdateList(listObj, uint64(resp.Revision))
 }
 
 // List implements storage.Interface.List.
@@ -329,13 +329,27 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	if !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	getResp, err := s.client.List(ctx, key)
+
+	if resourceVersion == "" {
+		resourceVersion = "0"
+	}
+
+	revInt, err := strconv.ParseInt(resourceVersion, 10, 64)
+	if err != nil {
+		return err2.Wrapf(err, "Invalid revision: %s", resourceVersion)
+	}
+	getResp, err := s.client.List(ctx, revInt, key)
 	if err != nil {
 		return err
 	}
 
 	elems := make([]*elemForDecode, 0, len(getResp))
+	revision := int64(0)
 	for _, item := range getResp {
+		if item.Revision > revision {
+			revision = item.Revision
+		}
+
 		data, _, err := s.transformer.TransformFromStorage(item.Value, authenticatedDataString(item.Key))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", key, err))
@@ -350,8 +364,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
 	}
-	// TODO: List revision seems silly and complicated. Setting to 0
-	return s.versioner.UpdateList(listObj, 0)
+	return s.versioner.UpdateList(listObj, uint64(revision))
 }
 
 // Watch implements storage.Interface.Watch.

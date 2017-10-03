@@ -18,9 +18,11 @@ func Register(name string, d dialect) {
 }
 
 type dialect interface {
+	Start(ctx context.Context, db *sql.DB) error
+
 	Get(ctx context.Context, db *sql.DB, key string) (*kv.KeyValue, error)
 
-	List(ctx context.Context, db *sql.DB, key string) ([]*kv.KeyValue, error)
+	List(ctx context.Context, db *sql.DB, rev int64, key string) ([]*kv.KeyValue, error)
 
 	Create(ctx context.Context, db *sql.DB, key string, value []byte, ttl uint64) error
 

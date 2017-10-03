@@ -20,6 +20,10 @@ func newClient(ctx context.Context, dialectName string, db *sql.DB) (kv.Client, 
 		return nil, fmt.Errorf("Failed to find dialect %v", dialectName)
 	}
 
+	if err := dialect.Start(ctx, db); err != nil {
+		return nil, err
+	}
+
 	client := &client{
 		db:       db,
 		dialect:  dialect,
@@ -43,8 +47,8 @@ func (c *client) Get(ctx context.Context, key string) (*kv.KeyValue, error) {
 	return c.dialect.Get(ctx, c.db, key)
 }
 
-func (c *client) List(ctx context.Context, key string) ([]*kv.KeyValue, error) {
-	return c.dialect.List(ctx, c.db, key)
+func (c *client) List(ctx context.Context, revision int64, key string) ([]*kv.KeyValue, error) {
+	return c.dialect.List(ctx, c.db, revision, key)
 }
 
 func (c *client) Create(ctx context.Context, key string, value []byte, ttl uint64) (*kv.KeyValue, error) {

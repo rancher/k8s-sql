@@ -69,6 +69,7 @@ type watcher struct {
 type watchChan struct {
 	watcher           *watcher
 	key               string
+	rev               int64
 	recursive         bool
 	internalFilter    storage.FilterFunc
 	ctx               context.Context
@@ -107,6 +108,7 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
+		rev:               rev,
 		recursive:         recursive,
 		internalFilter:    storage.SimpleFilter(pred),
 		incomingEventChan: make(chan *event, incomingBufSize),
@@ -167,7 +169,7 @@ func (wc *watchChan) ResultChan() <-chan watch.Event {
 // - get current objects if initialRev=0; set initialRev to current rev
 // - watch on given key and send events to process.
 func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
-	getResp, wch, err := wc.watcher.client.Watch(wc.ctx, wc.key)
+	getResp, wch, err := wc.watcher.client.Watch(wc.ctx, wc.rev, wc.key)
 	if err != nil {
 		glog.Errorf("failed to sync with latest state: %v", err)
 		wc.sendError(err)
