@@ -58,5 +58,5 @@ Yeah, it's a bit hacky because the API server is sort of hard coded to etcd. Als
 Known Issues/Limitations
 ------------------------
 
-1. List responses don't have a proper version on them (does it really matter??).
+1. Watch caching doesn't work correctly
 2. No HA apiserver support.  Watches are using in-memory stuff that won't allow multiple API servers.  If this basic implementation goes well shouldn't be terrible to add proper HA.

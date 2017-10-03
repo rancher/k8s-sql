@@ -15,7 +15,7 @@ type Client interface {
 	Get(ctx context.Context, key string) (*KeyValue, error)
 
 	// Similar to get but looks for "like 'key%'"
-	List(ctx context.Context, key string) ([]*KeyValue, error)
+	List(ctx context.Context, revision int64, key string) ([]*KeyValue, error)
 
 	// Should return ErrExists on conflict
 	Create(ctx context.Context, key string, value []byte, ttl uint64) (*KeyValue, error)
@@ -29,7 +29,7 @@ type Client interface {
 	// Should return ErrNotExists, if key doesn't exist it should be created
 	UpdateOrCreate(ctx context.Context, key string, value []byte, revision int64, ttl uint64) (*KeyValue, error)
 
-	Watch(ctx context.Context, key string) ([]*KeyValue, WatchChan, error)
+	Watch(ctx context.Context, revision int64, key string) ([]*KeyValue, WatchChan, error)
 }
 
 type WatchChan <-chan WatchResponse

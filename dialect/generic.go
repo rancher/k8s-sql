@@ -3,31 +3,44 @@ package dialect
 import (
 	"context"
 	"database/sql"
-
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/k8s-sql"
 	"github.com/rancher/k8s-sql/kv"
+	"sync/atomic"
 )
 
 type Generic struct {
-	CleanupSQL string
-	GetSQL     string
-	ListSQL    string
-	CreateSQL  string
-	DeleteSQL  string
-	UpdateSQL  string
+	CleanupSQL      string
+	GetSQL          string
+	ListSQL         string
+	ListRevisionSQL string
+	CreateSQL       string
+	DeleteSQL       string
+	UpdateSQL       string
+	GetRevisionSQL  string
+	revision        int64
 }
 
-func (g *Generic) Start(ctx context.Context, db *sql.DB) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Minute):
-			db.ExecContext(ctx, g.CleanupSQL, time.Now().Second())
-		}
+func (g *Generic) Start(ctx context.Context, db *sql.DB) error {
+	row := db.QueryRowContext(ctx, g.GetRevisionSQL)
+	if err := row.Scan(&g.revision); err != nil {
+		return errors.Wrap(err, "Failed to initialize revision")
 	}
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Minute):
+				db.ExecContext(ctx, g.CleanupSQL, time.Now().Second())
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (g *Generic) Get(ctx context.Context, db *sql.DB, key string) (*kv.KeyValue, error) {
@@ -42,9 +55,17 @@ func (g *Generic) Get(ctx context.Context, db *sql.DB, key string) (*kv.KeyValue
 	return &value, err
 }
 
-func (g *Generic) List(ctx context.Context, db *sql.DB, key string) ([]*kv.KeyValue, error) {
-	rows, err := db.QueryContext(ctx, g.ListSQL, key+"%")
+func (g *Generic) List(ctx context.Context, db *sql.DB, revision int64, key string) ([]*kv.KeyValue, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
 
+	if revision <= 0 {
+		rows, err = db.QueryContext(ctx, g.ListSQL, key+"%")
+	} else {
+		rows, err = db.QueryContext(ctx, g.ListRevisionSQL, revision, key+"%")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +87,8 @@ func (g *Generic) Create(ctx context.Context, db *sql.DB, key string, value []by
 	if ttl != 0 {
 		ttl = uint64(time.Now().Second()) + ttl
 	}
-	_, err := db.ExecContext(ctx, g.CreateSQL, key, []byte(value), ttl)
+	newRev := atomic.AddInt64(&g.revision, 1)
+	_, err := db.ExecContext(ctx, g.CreateSQL, key, []byte(value), newRev, ttl)
 	return err
 }
 
@@ -109,7 +131,8 @@ func (g *Generic) Update(ctx context.Context, db *sql.DB, key string, value []by
 		return nil, nil, rdbms.ErrRevisionMatch
 	}
 
-	result, err := db.ExecContext(ctx, g.UpdateSQL, value, oldKv.Revision+1, key, oldKv.Revision)
+	newRevision := atomic.AddInt64(&g.revision, 1)
+	result, err := db.ExecContext(ctx, g.UpdateSQL, value, newRevision, key, oldKv.Revision)
 	if err != nil {
 		return nil, nil, err
 	}

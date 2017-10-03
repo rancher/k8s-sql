@@ -8,9 +8,9 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (c *client) Watch(ctx context.Context, key string) ([]*kv.KeyValue, kv.WatchChan, error) {
+func (c *client) Watch(ctx context.Context, revision int64, key string) ([]*kv.KeyValue, kv.WatchChan, error) {
 	watcher := c.createWatcher(ctx, key)
-	listResp, err := c.List(ctx, key)
+	listResp, err := c.List(ctx, revision, key)
 	return listResp, kv.WatchChan(watcher), err
 }
 
