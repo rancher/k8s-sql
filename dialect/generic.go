@@ -3,12 +3,12 @@ package dialect
 import (
 	"context"
 	"database/sql"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/k8s-sql"
 	"github.com/rancher/k8s-sql/kv"
-	"sync/atomic"
 )
 
 type Generic struct {
@@ -25,8 +25,14 @@ type Generic struct {
 
 func (g *Generic) Start(ctx context.Context, db *sql.DB) error {
 	row := db.QueryRowContext(ctx, g.GetRevisionSQL)
-	if err := row.Scan(&g.revision); err != nil {
+	rev := sql.NullInt64{}
+	if err := row.Scan(&rev); err != nil {
 		return errors.Wrap(err, "Failed to initialize revision")
+	}
+	if rev.Int64 == 0 {
+		g.revision = 1
+	} else {
+		g.revision = rev.Int64
 	}
 
 	go func() {
