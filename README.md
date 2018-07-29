@@ -1,3 +1,6 @@
+This repo is not maintained, the idea was continued forward using a different approach, refer to https://github.com/ibuildthecloud/etcd/tree/clientv3
+---------------------
+
 SQL Storage Backend for Kubernetes
 ==================================
 
